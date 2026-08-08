@@ -7,7 +7,14 @@ export interface SessionState {
   topics: CurriculumDay[];
   transcript: { role: 'interviewer' | 'candidate'; content: string }[];
   questionCount: number;
+  coveredDays: number[];
   done: boolean;
+  feedback?: {
+    summary: string;
+    strengths: string[];
+    gaps: string[];
+    next: string[];
+  };
 }
 
 export async function createSession(sessionId: string, candidateId: string, topics: CurriculumDay[]): Promise<SessionState> {
@@ -24,6 +31,7 @@ export async function createSession(sessionId: string, candidateId: string, topi
     topics,
     transcript: [],
     questionCount: 0,
+    coveredDays: [],
     done: false
   };
 

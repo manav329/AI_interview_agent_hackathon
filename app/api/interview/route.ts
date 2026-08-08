@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCandidateById, selectInterviewTopics, getCurriculum } from '@/lib/data';
-import { buildSystemPrompt } from '@/lib/prompt';
+import { buildSystemPrompt, buildFeedbackPrompt } from '@/lib/prompt';
 import { createSession, saveSession, getSession } from '@/lib/session';
 import Groq from 'groq-sdk';
 import { Candidate } from '@/lib/types';
@@ -26,16 +26,20 @@ export async function POST(req: Request) {
       }
 
       if (session.done) {
-        return NextResponse.json({ error: 'Interview is already finished' }, { status: 400 });
+        return NextResponse.json({ 
+          reply: 'Interview completed.', 
+          done: true, 
+          feedback: session.feedback 
+        });
       }
 
       session.transcript.push({ role: 'candidate', content: message });
 
       const candidate = getCandidateById(session.candidateId);
-      const candidateToUse = candidate || {
-        member: { id: session.candidateId, name: 'Candidate', jobRole: 'Candidate', yearsExperience: 0, education: 'N/A', status: '' },
-        missions: [],
-        signals: { commitDays: 0, missionsCompleted: 0, missionsFirstTry: 0 }
+      const candidateToUse = candidate || { 
+        member: { id: session.candidateId, name: 'Candidate', jobRole: 'Candidate', yearsExperience: 0, education: 'N/A', status: '' }, 
+        missions: [], 
+        signals: { commitDays: 0, missionsCompleted: 0, missionsFirstTry: 0 } 
       };
 
       const systemPrompt = buildSystemPrompt(candidateToUse, session.topics);
@@ -44,31 +48,100 @@ export async function POST(req: Request) {
         apiKey: process.env.GROQ_API_KEY
       });
 
-      const instruction = "Based on the candidate's last answer, either ask a natural follow-up on the same topic, or transition to the next uncovered topic. Ask exactly one question. If you have now asked at least 8 questions total across at least 4 topics and covered what you need, do not ask a new question — instead respond only with the literal token END_INTERVIEW.";
+      let llmReply = '';
 
-      const messages: any[] = [
-        { role: 'system', content: systemPrompt },
-        ...session.transcript.map(turn => ({
-          role: turn.role === 'interviewer' ? 'assistant' : 'user',
-          content: turn.content
-        })),
-        { role: 'system', content: instruction }
-      ];
+      if (!session.coveredDays) {
+        session.coveredDays = [];
+      }
 
-      const completion = await groq.chat.completions.create({
-        messages,
-        model: 'llama-3.3-70b-versatile',
-      });
+      if (session.questionCount > 14) {
+        llmReply = 'END_INTERVIEW';
+      } else {
+        const instruction = `The exact current questionCount so far: ${session.questionCount}.
+The exact list of distinct days covered so far: [${session.coveredDays.join(', ')}].
+You MUST NOT respond with END_INTERVIEW unless questionCount is already at least 8 AND at least 4 distinct days have been covered. If either condition is not yet met, you MUST ask another question, either a follow-up on an already-covered topic or a question on a new uncovered topic from the provided topic list.
+CRITICAL INSTRUCTION: You must include [Day X] in your response (where X is the day number of the topic you are addressing) so the system can track covered days.`;
 
-      const llmReply = completion.choices[0]?.message?.content?.trim() || '';
+        const messages: any[] = [
+          { role: 'system', content: systemPrompt },
+          ...session.transcript.map(turn => ({
+            role: turn.role === 'interviewer' ? 'assistant' : 'user',
+            content: turn.content
+          })),
+          { role: 'system', content: instruction }
+        ];
+
+        const completion = await groq.chat.completions.create({
+          messages,
+          model: 'llama-3.3-70b-versatile',
+        });
+
+        llmReply = completion.choices[0]?.message?.content?.trim() || '';
+
+        let isEnding = llmReply.toUpperCase() === 'END_INTERVIEW';
+
+        if (isEnding && (session.questionCount < 8 || session.coveredDays.length < 4)) {
+          console.warn(`[Override] LLM attempted to end interview early (QCount: ${session.questionCount}, Days: ${session.coveredDays.length}). Forcing a new question.`);
+          
+          const overrideMessages: any[] = [
+            ...messages,
+            { role: 'assistant', content: llmReply },
+            { role: 'user', content: `You attempted to end the interview, but you are not allowed to yet. As a reminder, questionCount is ${session.questionCount} and you need 8. Covered days is ${session.coveredDays.length} and you need 4. You MUST ask a genuine next question. Do not end the interview. Remember to include [Day X] in your response.` }
+          ];
+
+          const overrideCompletion = await groq.chat.completions.create({
+            messages: overrideMessages,
+            model: 'llama-3.3-70b-versatile',
+          });
+
+          llmReply = overrideCompletion.choices[0]?.message?.content?.trim() || '';
+        }
+      }
 
       if (llmReply.toUpperCase() === 'END_INTERVIEW') {
-        // Fallback end-of-interview logic.
-        // NOTE: Awaiting clarification on what the actual Step 6 end-of-interview logic is.
+        const feedbackPrompt = buildFeedbackPrompt(session.transcript, session.topics);
+        const feedbackCompletion = await groq.chat.completions.create({
+          messages: [{ role: 'user', content: feedbackPrompt }],
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.2
+        });
+
+        let rawFeedback = feedbackCompletion.choices[0]?.message?.content?.trim() || '{}';
+        let parsedFeedback;
+
+        try {
+          parsedFeedback = JSON.parse(rawFeedback);
+        } catch (e) {
+          rawFeedback = rawFeedback.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '').trim();
+          try {
+            parsedFeedback = JSON.parse(rawFeedback);
+          } catch (e2) {
+            parsedFeedback = {};
+          }
+        }
+
+        const feedback = {
+          summary: typeof parsedFeedback.summary === 'string' ? parsedFeedback.summary : '',
+          strengths: Array.isArray(parsedFeedback.strengths) ? parsedFeedback.strengths : [],
+          gaps: Array.isArray(parsedFeedback.gaps) ? parsedFeedback.gaps : [],
+          next: Array.isArray(parsedFeedback.next) ? parsedFeedback.next : []
+        };
+
         session.done = true;
+        session.feedback = feedback;
         await saveSession(session);
-        return NextResponse.json({ reply: 'Interview complete.', done: true });
+
+        return NextResponse.json({ reply: 'Interview completed.', done: true, feedback });
       } else {
+        const dayMatch = llmReply.match(/\[Day\s*(\d+)\]/i);
+        if (dayMatch) {
+          const day = parseInt(dayMatch[1], 10);
+          if (!session.coveredDays.includes(day)) {
+            session.coveredDays.push(day);
+          }
+          llmReply = llmReply.replace(dayMatch[0], '').trim();
+        }
+
         session.transcript.push({ role: 'interviewer', content: llmReply });
         session.questionCount += 1;
         await saveSession(session);
@@ -98,12 +171,18 @@ export async function POST(req: Request) {
     const completion = await groq.chat.completions.create({
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: 'Please produce a warm opening message and the first interview question as ONE message. Start now.' }
+        { role: 'user', content: 'Please produce a warm opening message and the first interview question as ONE message. Start now. CRITICAL INSTRUCTION: You must include [Day X] in your response (where X is the day number of the topic you are addressing) so the system can track covered days.' }
       ],
       model: 'llama-3.3-70b-versatile',
     });
 
-    const reply = completion.choices[0]?.message?.content || 'Hello, are you ready to begin?';
+    let reply = completion.choices[0]?.message?.content?.trim() || 'Hello, are you ready to begin?';
+    let initialCoveredDays: number[] = [];
+    const dayMatch = reply.match(/\[Day\s*(\d+)\]/i);
+    if (dayMatch) {
+      initialCoveredDays.push(parseInt(dayMatch[1], 10));
+      reply = reply.replace(dayMatch[0], '').trim();
+    }
 
     let session;
     try {
@@ -114,6 +193,7 @@ export async function POST(req: Request) {
 
     session.transcript.push({ role: 'interviewer', content: reply });
     session.questionCount = 1;
+    session.coveredDays = initialCoveredDays;
     await saveSession(session);
 
     return NextResponse.json({ reply, done: false });
