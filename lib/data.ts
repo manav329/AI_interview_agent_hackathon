@@ -42,6 +42,10 @@ export function getCandidateById(id: string): Candidate | undefined {
   return candidatesData.find(c => c.member.id === id);
 }
 
+export function getCurriculum(): Curriculum {
+  return curriculumData;
+}
+
 export function selectInterviewTopics(candidate: Candidate, curriculum: Curriculum, minDays: number = 4): CurriculumDay[] {
   const selectedDays = new Set<number>();
   const missions = candidate.missions || [];

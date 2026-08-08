@@ -1,0 +1,19 @@
+{
+  "sessionId": "test-003",
+  "candidate": {
+    "member": {
+      "id": "CAND-001",
+      "name": "Sarah Johnson",
+      "jobRole": "Senior Data Engineer",
+      "yearsExperience": 9,
+      "education": "MS Computer Science",
+      "status": "COMPLETED"
+    },
+    "missions": [],
+    "signals": {
+      "commitDays": 28,
+      "missionsCompleted": 30,
+      "missionsFirstTry": 20
+    }
+  }
+}
