@@ -20,7 +20,7 @@ export interface SessionState {
 
 export async function createSession(sessionId: string, candidateId: string, topics: CurriculumDay[]): Promise<SessionState> {
   const key = `interview:session:${sessionId}`;
-  
+
   const existing = await kv.get<SessionState>(key);
   if (existing) {
     throw new Error(`Session with ID ${sessionId} already exists.`);

@@ -5,13 +5,39 @@ import { createSession, saveSession, getSession } from '@/lib/session';
 import Groq from 'groq-sdk';
 import { Candidate } from '@/lib/types';
 
+async function callGroqWithTimeout(groq: Groq, options: any) {
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), 25000);
+  try {
+    const completion = await groq.chat.completions.create(options, { signal: abortController.signal as any });
+    clearTimeout(timeoutId);
+    return completion;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
 export async function GET() {
-  return NextResponse.json({ message: 'Interview API ready.' });
+  return NextResponse.json({ error: 'This endpoint only accepts POST' }, { status: 405 });
 }
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    if (!process.env.GROQ_API_KEY || !process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+      return NextResponse.json({ error: 'Server misconfigured: missing API key' }, { status: 500 });
+    }
+
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 });
+    }
+
+    if (!body || typeof body !== 'object' || (body.candidate === undefined && body.message === undefined)) {
+      return NextResponse.json({ error: 'Invalid request shape. Expected either { sessionId, message } or { sessionId, candidate }.' }, { status: 400 });
+    }
 
     if (body.message !== undefined) {
       const { sessionId, message } = body;
@@ -26,20 +52,20 @@ export async function POST(req: Request) {
       }
 
       if (session.done) {
-        return NextResponse.json({ 
-          reply: 'Interview completed.', 
-          done: true, 
-          feedback: session.feedback 
+        return NextResponse.json({
+          reply: 'Interview completed.',
+          done: true,
+          feedback: session.feedback
         });
       }
 
       session.transcript.push({ role: 'candidate', content: message });
 
       const candidate = getCandidateById(session.candidateId);
-      const candidateToUse = candidate || { 
-        member: { id: session.candidateId, name: 'Candidate', jobRole: 'Candidate', yearsExperience: 0, education: 'N/A', status: '' }, 
-        missions: [], 
-        signals: { commitDays: 0, missionsCompleted: 0, missionsFirstTry: 0 } 
+      const candidateToUse = candidate || {
+        member: { id: session.candidateId, name: 'Candidate', jobRole: 'Candidate', yearsExperience: 0, education: 'N/A', status: '' },
+        missions: [],
+        signals: { commitDays: 0, missionsCompleted: 0, missionsFirstTry: 0 }
       };
 
       const systemPrompt = buildSystemPrompt(candidateToUse, session.topics);
@@ -66,13 +92,13 @@ export async function POST(req: Request) {
       let forceTopicInstruction = '';
       const historyLen = session.topicHistory.length;
       if (historyLen >= 3) {
-         const last3 = session.topicHistory.slice(-3);
-         if (last3[0] === last3[1] && last3[1] === last3[2]) {
-            const nextTopic = uncoveredTopics.length > 0 ? uncoveredTopics[0] : null;
-            if (nextTopic) {
-               forceTopicInstruction = `\n\nSERVER OVERRIDE: You have spent too many turns on Day ${last3[0]}. You MUST now move on and ask a question about Day ${nextTopic.day} (${nextTopic.title}).`;
-            }
-         }
+        const last3 = session.topicHistory.slice(-3);
+        if (last3[0] === last3[1] && last3[1] === last3[2]) {
+          const nextTopic = uncoveredTopics.length > 0 ? uncoveredTopics[0] : null;
+          if (nextTopic) {
+            forceTopicInstruction = `\n\nSERVER OVERRIDE: You have spent too many turns on Day ${last3[0]}. You MUST now move on and ask a question about Day ${nextTopic.day} (${nextTopic.title}).`;
+          }
+        }
       }
 
       if (session.questionCount > 14) {
@@ -101,7 +127,7 @@ CRITICAL INSTRUCTION: You must include <topic_day>X</topic_day> in your response
           { role: 'system', content: instruction }
         ];
 
-        const completion = await groq.chat.completions.create({
+        const completion = await callGroqWithTimeout(groq, {
           messages,
           model: 'llama-3.3-70b-versatile',
         });
@@ -112,14 +138,14 @@ CRITICAL INSTRUCTION: You must include <topic_day>X</topic_day> in your response
 
         if (isEnding && (session.questionCount < 8 || session.coveredDays.length < 4)) {
           console.warn(`[Override] LLM attempted to end interview early (QCount: ${session.questionCount}, Days: ${session.coveredDays.length}). Forcing a new question.`);
-          
+
           const overrideMessages: any[] = [
             ...messages,
             { role: 'assistant', content: llmReply },
             { role: 'user', content: `You attempted to end the interview, but you are not allowed to yet. As a reminder, questionCount is ${session.questionCount} and you need 8. Covered days is ${session.coveredDays.length} and you need 4. You MUST ask a genuine next question. Do not end the interview. Remember to include <topic_day>X</topic_day> in your response.` }
           ];
 
-          const overrideCompletion = await groq.chat.completions.create({
+          const overrideCompletion = await callGroqWithTimeout(groq, {
             messages: overrideMessages,
             model: 'llama-3.3-70b-versatile',
           });
@@ -130,7 +156,7 @@ CRITICAL INSTRUCTION: You must include <topic_day>X</topic_day> in your response
 
       if (llmReply.toUpperCase() === 'END_INTERVIEW') {
         const feedbackPrompt = buildFeedbackPrompt(session.transcript, session.topics);
-        const feedbackCompletion = await groq.chat.completions.create({
+        const feedbackCompletion = await callGroqWithTimeout(groq, {
           messages: [{ role: 'user', content: feedbackPrompt }],
           model: 'llama-3.3-70b-versatile',
           temperature: 0.2
@@ -178,11 +204,11 @@ CRITICAL INSTRUCTION: You must include <topic_day>X</topic_day> in your response
         session.transcript.push({ role: 'interviewer', content: llmReply });
         session.questionCount += 1;
         await saveSession(session);
-        return NextResponse.json({ 
-          reply: llmReply, 
-          done: false, 
+        return NextResponse.json({
+          reply: llmReply,
+          done: false,
           questionCount: session.questionCount,
-          currentDay 
+          currentDay
         });
       }
     }
@@ -206,7 +232,7 @@ CRITICAL INSTRUCTION: You must include <topic_day>X</topic_day> in your response
       apiKey: process.env.GROQ_API_KEY
     });
 
-    const completion = await groq.chat.completions.create({
+    const completion = await callGroqWithTimeout(groq, {
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Please produce a warm opening message and the first interview question as ONE message. Start now. CRITICAL INSTRUCTION: You must include <topic_day>X</topic_day> in your response (where X is the day number of the topic you are addressing) so the system can track covered days.' }
@@ -237,14 +263,20 @@ CRITICAL INSTRUCTION: You must include <topic_day>X</topic_day> in your response
     session.topicHistory = currentDay !== null ? [currentDay] : [];
     await saveSession(session);
 
-    return NextResponse.json({ 
-      reply, 
+    return NextResponse.json({
+      reply,
       done: false,
       questionCount: session.questionCount,
       currentDay
     });
   } catch (error: any) {
-    console.error('Error starting interview:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('Error in interview request processing:', error);
+    if (error.name === 'AbortError' || error.status === 504) {
+      return NextResponse.json({ error: 'LLM request timed out. Please try again.' }, { status: 504 });
+    }
+    if (error.status === 429) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Please retry shortly.' }, { status: 429 });
+    }
+    return NextResponse.json({ error: 'Something went wrong processing your interview request.' }, { status: 500 });
   }
 }
