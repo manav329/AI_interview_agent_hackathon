@@ -133,8 +133,9 @@ CRITICAL INSTRUCTION: You must include <topic_day>X</topic_day> in your response
         });
 
         llmReply = completion.choices[0]?.message?.content?.trim() || '';
+        llmReply = llmReply.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '').trim();
 
-        let isEnding = llmReply.toUpperCase() === 'END_INTERVIEW';
+        let isEnding = llmReply.toUpperCase().includes('END_INTERVIEW');
 
         if (isEnding && (session.questionCount < 8 || session.coveredDays.length < 4)) {
           console.warn(`[Override] LLM attempted to end interview early (QCount: ${session.questionCount}, Days: ${session.coveredDays.length}). Forcing a new question.`);
@@ -151,10 +152,11 @@ CRITICAL INSTRUCTION: You must include <topic_day>X</topic_day> in your response
           });
 
           llmReply = overrideCompletion.choices[0]?.message?.content?.trim() || '';
+          llmReply = llmReply.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '').trim();
         }
       }
 
-      if (llmReply.toUpperCase() === 'END_INTERVIEW') {
+      if (llmReply.toUpperCase().includes('END_INTERVIEW')) {
         const feedbackPrompt = buildFeedbackPrompt(session.transcript, session.topics);
         const feedbackCompletion = await callGroqWithTimeout(groq, {
           messages: [{ role: 'user', content: feedbackPrompt }],
@@ -241,6 +243,7 @@ CRITICAL INSTRUCTION: You must include <topic_day>X</topic_day> in your response
     });
 
     let reply = completion.choices[0]?.message?.content?.trim() || 'Hello, are you ready to begin?';
+    reply = reply.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '').trim();
     let initialCoveredDays: number[] = [];
     let currentDay: number | null = null;
     const dayMatch = reply.match(/<topic_day>(\d+)<\/topic_day>/i);
