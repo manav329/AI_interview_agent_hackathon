@@ -8,6 +8,7 @@ export interface SessionState {
   transcript: { role: 'interviewer' | 'candidate'; content: string }[];
   questionCount: number;
   coveredDays: number[];
+  topicHistory?: number[];
   done: boolean;
   feedback?: {
     summary: string;
