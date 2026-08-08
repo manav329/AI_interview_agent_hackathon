@@ -38,10 +38,6 @@ This log documents all AI-assisted development on the AI Interview Agent project
 
 ---
 
-## How this log was maintained
-
-Entries were added incrementally during development, immediately after each Antigravity session that produced or modified code — not written retroactively at submission time. Dates reflect actual working sessions.
-
 ## Notes
 
 - All curriculum and candidate data used are the synthetic files provided for this hackathon.
