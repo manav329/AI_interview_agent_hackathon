@@ -1,0 +1,407 @@
+.container {
+  display: flex;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #D2D8C0;
+  color: #4E4E73;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar {
+  background-color: #4E4E73;
+  color: #D2D8C0;
+  transition: width 0.3s ease;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebarClosed {
+  width: 48px;
+}
+
+.sidebarOpen {
+  width: 450px;
+  overflow-y: auto;
+}
+
+.sidebarToggle {
+  background: none;
+  border: none;
+  color: #D2D8C0;
+  padding: 16px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100vh;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  border-right: 1px solid rgba(210, 216, 192, 0.1);
+}
+
+.sidebarOpen .sidebarToggle {
+  height: auto;
+  writing-mode: horizontal-tb;
+  border-right: none;
+  border-bottom: 1px solid rgba(210, 216, 192, 0.1);
+  padding: 24px;
+}
+
+.sidebarToggle:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.sidebarToggleText {
+  display: inline-block;
+  transform: rotate(180deg);
+}
+
+.sidebarOpen .sidebarToggleText {
+  transform: none;
+}
+
+.sidebarIcon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+}
+
+.sidebarIcon span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background-color: #D2D8C0;
+}
+
+.sidebarNav {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  margin: 0;
+}
+
+.navLink {
+  color: #D2D8C0;
+  text-decoration: none;
+  padding: 12px 16px;
+  display: block;
+  white-space: nowrap;
+}
+
+.navLink:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebarContent {
+  padding: 20px 24px 40px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.guideWrapper {
+  min-width: 400px;
+}
+
+.guideContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.guideSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guideHeading {
+  color: #D2D8C0;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  border-bottom: 1px solid rgba(210, 216, 192, 0.2);
+  padding-bottom: 4px;
+}
+
+.guideText {
+  margin: 0;
+}
+
+.guideList {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.guideList li {
+  margin-bottom: 6px;
+}
+
+.guideCodeBlock {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 4px;
+  border-left: 3px solid #226C77;
+  font-family: monospace;
+  font-size: 13px;
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.guideCodeInline {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.guideLink {
+  color: #D2D8C0;
+  text-decoration: underline;
+  text-decoration-color: #226C77;
+}
+
+.guideLink:hover {
+  color: white;
+}
+
+.sidebarOpen .sidebarContent {
+  opacity: 1;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Start View */
+.panel {
+  background-color: #f8f9f6;
+  border-radius: 8px;
+  padding: 40px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+}
+
+.title {
+  color: #226C77;
+  margin: 0 0 10px 0;
+  font-weight: 600;
+  font-size: 24px;
+}
+
+.select {
+  padding: 12px;
+  border: 1px solid #4E4E73;
+  border-radius: 4px;
+  font-size: 16px;
+  color: #4E4E73;
+  background: white;
+  outline: none;
+}
+
+.select:focus {
+  border-color: #226C77;
+}
+
+.btn {
+  background-color: #226C77;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #F35E5E;
+  font-size: 14px;
+  padding: 10px;
+  background: rgba(243, 94, 94, 0.1);
+  border-left: 3px solid #F35E5E;
+}
+
+/* Chat View */
+.chatContainer {
+  width: 100%;
+  max-width: 800px;
+  height: 65vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.chatHeader {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 20px;
+  color: #4E4E73;
+  font-size: 14px;
+}
+
+.messageList {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 20px;
+}
+
+.message {
+  max-width: 75%;
+  padding: 16px 20px;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+
+.messageInterviewer {
+  align-self: flex-start;
+  background-color: #f8f9f6;
+  color: #4E4E73;
+  border: 1px solid rgba(78, 78, 115, 0.1);
+}
+
+.messageUser {
+  align-self: flex-end;
+  background-color: #226C77;
+  color: white;
+}
+
+.inlineError {
+  color: #F35E5E;
+  font-size: 14px;
+  text-align: center;
+  padding: 8px;
+}
+
+.inputArea {
+  display: flex;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(78, 78, 115, 0.2);
+}
+
+.input {
+  flex: 1;
+  padding: 16px;
+  border: 1px solid #4E4E73;
+  border-radius: 4px;
+  font-size: 16px;
+  background: white;
+  color: #4E4E73;
+  outline: none;
+}
+
+.input:focus {
+  border-color: #226C77;
+}
+
+.sendBtn {
+  background-color: #226C77;
+  color: white;
+  border: none;
+  padding: 0 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sendBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.arrowIcon {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.typingIndicator {
+  color: #4E4E73;
+  font-style: italic;
+  font-size: 14px;
+  padding: 8px 0;
+  align-self: flex-start;
+}
+
+/* Feedback View */
+.feedbackContainer {
+  width: 100%;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  background-color: #f8f9f6;
+  padding: 40px;
+  border-radius: 8px;
+  margin: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  overflow-y: auto;
+}
+
+.feedbackSummary {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.feedbackSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feedbackSection h3 {
+  color: #226C77;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.feedbackSection h3.gapsLabel {
+  color: #F35E5E;
+}
+
+.feedbackList {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+
+.feedbackList li {
+  margin-bottom: 8px;
+}
